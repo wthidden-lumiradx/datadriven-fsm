@@ -1,0 +1,55 @@
+@startuml
+'https://plantuml.com/state-diagram
+title "__<color:blue>//Async//<color:black>__ **Interconnect** Receive Message States"
+scale 350 width
+skinparam state {
+   StartColor MediumBlue
+   EndColor Red
+   BorderColor Gray
+   FontName Impact
+   arrow {
+     FontName Impact
+     FontColor Blue
+     Color Black
+   }
+}
+
+ReadMsgId : recv(socket)
+ReadMsgId : validateId(id)
+ReadMsgSize : recv(socket)
+ReadMsgSize : validateSize(id, size)
+ReadMsgPayload : recv(socket)
+ReadMsgPayload : validateMsg(id, size, payload)
+ProcessMsg : sendMsg(msg)
+MsgReadError : updateError(msg)
+MsgIdError : sendMsgError(id, -1, 0)
+MsgTimeout : timeout_msg(state)
+CloseMsg : terminateMsg(state)
+MsgSizeError : sendMsgError(id, size, 0)
+MsgPayloadError : sendMsgError(id, size, payload)
+[*] -down[#black]-> ReadMsgId : accept(socket)
+ReadMsgId --> ReadMsgId : more_data
+ReadMsgId --> CloseMsg : socket_closed
+ReadMsgId -> MsgReadError : socket_error
+ReadMsgId --> MsgIdError : invalid_id
+ReadMsgId --> ReadMsgSize : valid_id
+ReadMsgId -> MsgTimeout : timeout
+ReadMsgSize --> ReadMsgSize : more_data
+ReadMsgSize --> CloseMsg : socket_closed
+ReadMsgSize --> MsgReadError : socket_error
+ReadMsgSize --> MsgSizeError : invalid_size
+ReadMsgSize --> ReadMsgPayload : valid_size
+ReadMsgSize -> MsgTimeout : timeout
+MsgSizeError --> [*]
+ReadMsgPayload --> ReadMsgPayload : more_data
+ReadMsgPayload -> CloseMsg : socket_closed
+ReadMsgPayload --> MsgReadError : socket_error
+ReadMsgPayload -> MsgPayloadError : invalid_id
+ReadMsgPayload --> ProcessMsg : valid_msg
+MsgPayloadError --> [*]
+ReadMsgSize -> MsgTimeout : timeout
+ProcessMsg -> ReadMsgId : msg_processed
+MsgIdError --> [*]
+CloseMsg --> [*]
+MsgReadError --> [*]
+@enduml
