@@ -25,14 +25,6 @@ static uint32_t message_lock = 0;
 
 static message_t send_message_storage;
 
-#pragma pack(1)
-typedef struct strip_update_status_tag {
-    uint32_t sequence_no;
-    uint32_t param_1;
-    uint32_t param_2;
-} strip_update_status_t;
-#pragma pack()
-
 static SOCKET fbl_socket = INVALID_SOCKET;
 static message_t receive_message;
 
@@ -53,7 +45,7 @@ void reset_msg_input_state(const uint8_t *ptr, State *state, size_t *bytes_to_re
 void receive_input(void) {
     State state = READ_MSG_ID;
     uint8_t *ptr = 0;
-    uint32_t bytes_to_read = 0;
+    uint32_t bytes_to_read = sizeof(receive_message.header.id);
     int bytes_read;
     int continue_receiving = 1;
 
@@ -128,107 +120,49 @@ typedef struct {
     size_t size;
 } valid_msg_t;
 
-valid_msg_t KNOWN_MESSAGE_IDS[] = {{.id = 1, .size = 10},
-                                   {.id = 2, .size = 20},
-                                   {.id = 3, .size = 30},
-                                   {.id = 4, .size = 40},
-                                   {.id = 5, .size = 50},
-                                   {.id = 6, .size = 60},
-                                   {.id = 7, .size = 70},
-                                   {.id = 100, .size = 7000},
-};
-
-int valid_msg_id(uint32_t id) {
-    int found = 0;
-    for (int i = 0; i < sizeof(KNOWN_MESSAGE_IDS); i++) {
-        if (id == KNOWN_MESSAGE_IDS[i].id) {
-            found = 1;
-            break;
-        }
-    }
-    return found;
-}
-
-int valid_msg_size(uint32_t id, size_t size) {
-    int is_valid = 0;
-    for (int i = 0; i < sizeof(KNOWN_MESSAGE_IDS); i++) {
-        if (id == KNOWN_MESSAGE_IDS[i].id) {
-            is_valid = KNOWN_MESSAGE_IDS[i].size == size;
-            break;
-        }
-    }
-    return is_valid;
-}
-
-int process_message(message_t *message) {
-    return sizeof(*message);
-}
 typedef enum {
-    Idle_Msg_State,
-    Read_Msg_Id_State,
-    Read_Msg_Size_State,
-    Read_Msg_Payload_State,
-    Bad_Msg_State,
-    Read_very_long_Payload_State,
+    ReadMsgId_st,
+    ReadMsgSize_st,
+    ReadMsgPayload_st,
+    MsgIdError_st,
+    MsgTimeout_st,
+    CloseMsg_st,
+    MsgSizeError_st,
+    ProcessMsg_st,
+    MsgPayloadError_st,
+    MsgReadError_st,
     last_State,
 } FSMState;
 
 typedef enum {
-    Start_Msg_Event,
-    Validate_Msg_Id_Event,
-    Validate_Msg_Size_Event,
-    Process_Msg_Event,
-    Bad_Msg_Event,
-    Process_VeryLong_Msg_Event,
+    accept_evt,
+    more_data_evt,
+    valid_id_evt,
+    timeout_evt,
+    invalid_id_evt,
+    socket_closed_evt,
+    socket_error_evt,
+    valid_msg_evt,
+    valid_size_evt,
+    msg_processed_evt,
     last_event,
 } FSMEvent;
 
-FSMEvent NextEvent() {
-    return Start_Msg_Event;
-}
-
-typedef FSMState (*const afEventHandler[last_State][last_event])(void);
 typedef FSMState (*eventHandler)(void);
 
-FSMState ReadMsgId(void) {
-    return Read_Msg_Size_State;
+FSMState default_action_fn(void) {
+    return ReadMsgId_st;
 }
 
-FSMState ValidateMsgSize(void) {
-    return Read_Msg_Size_State;
-}
+typedef struct {
+  FSMState state;
+  FSMEvent event;
+  eventHandler action;
+} StateElement;
 
-FSMState ReadMsgSize(void) {
-    return Read_Msg_Payload_State;
-}
-
-FSMState ProcessMessage(void) {
-    static int tries = 0;
-    tries++;
-    if (tries > 5) {
-        return Bad_Msg_State;
-    }
-
-    return Idle_Msg_State;
-}
-
-FSMState HandleBadMsg(void) {
-    return Idle_Msg_State;
-}
-
-FSMState ProcessVeryLongMessage(void) {
-    return Idle_Msg_State;
-}
-
-static const afEventHandler StateMachine =
+static StateElement StateMachine[] =
         {
-                [Idle_Msg_State] = {[Start_Msg_Event] = ReadMsgId},
-                [Read_Msg_Id_State] = {[Validate_Msg_Id_Event] = ValidateMsgSize},
-                [Read_Msg_Size_State] = {[Validate_Msg_Size_Event] = ReadMsgSize},
-                [Read_Msg_Payload_State] = {[Process_Msg_Event] = ProcessMessage},
-                [Bad_Msg_State] = {[Bad_Msg_Event] = HandleBadMsg},
-                [Read_very_long_Payload_State] = {[Process_VeryLong_Msg_Event] = ProcessVeryLongMessage},
-
+                {ReadMsgId_st, more_data_evt, default_action_fn},
         };
 
 

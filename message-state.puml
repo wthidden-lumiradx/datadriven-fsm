@@ -2,7 +2,9 @@
 'https://plantuml.com/state-diagram
 title "__<color:blue>//Async//<color:black>__ **Interconnect** Receive Message States"
 scale 350 width
-skinparam state {
+'!theme sketchy-outline
+'skinparam backgroundColor transparent
+Skinparam State {
    StartColor MediumBlue
    EndColor Red
    BorderColor Gray
@@ -10,7 +12,7 @@ skinparam state {
    arrow {
      FontName Impact
      FontColor Blue
-     Color Black
+     Color red
    }
 }
 
